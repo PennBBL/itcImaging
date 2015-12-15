@@ -1,0 +1,7 @@
+/import/monstrum/fndm2_new/subjects/118990_9219/10_ep2d_itc1_168
+/import/monstrum/fndm2_new/subjects/118990_9219/11_ep2d_itc2_168
+/import/monstrum/fndm2_new/subjects/18377_9339/10_ep2d_itc1_168
+/import/monstrum/fndm2_new/subjects/18377_9339/11_ep2d_itc2_168
+/import/monstrum/fndm2_new/subjects/18382_9374/12_ep2d_itc2_168
+/import/monstrum/fndm2_new/subjects/18406_9467/10_ep2d_itc1_168
+/import/monstrum/fndm2_new/subjects/18406_9467/11_ep2d_itc2_168

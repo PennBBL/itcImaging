@@ -1,0 +1,82 @@
+
+#input is a subject level directory from an array job
+
+#Single Subject
+subjdir=$(ls -d /import/monstrum/fndm2_new/subjects/99949_9044/)  #for non-grid testing, 
+
+#Subject loop (only use for array jobs)
+#subjects=$1
+#subjdir=$(cat $subjects|sed -n "${SGE_TASK_ID}p")  
+
+#loop through each functional run present
+
+echo ""
+cd $subjdir
+pwd
+ 
+#get scanid
+scanid=$(echo $subjdir | cut -d/ -f6 | cut -d_ -f2)
+echo "scanid is $scanid"
+
+#define structural target image
+mpragedir=$(ls -d $subjdir/*mprage/ 2> /dev/null)
+t1brain=$(ls $mpragedir/${scanid}_t1_brain.nii.gz 2> /dev/null)  
+t1head=$(ls $mpragedir/${scanid}_t1.nii.gz 2> /dev/null) 
+wmseg=$(ls $mpragedir/${scanid}_brain_mico_wm.nii.gz 2> /dev/null) 
+
+if [ ! -e "$t1brain" ]; then
+	echo "no t1 brain found to register to!!! exiting"
+	exit 1
+else
+	echo "structural target image is $t1brain"
+	echo "wm segment for bbr is $wmseg"
+fi
+
+#now go by sequence: find each task sequence
+
+serieslist=$(ls -d *itc*) 
+
+echo ""
+echo "series list for this subject is:"
+echo "$serieslist"
+
+for s in $serieslist; do
+	echo ""
+	echo "#######"
+
+	echo $s
+	outdir=$(ls -d ${subjdir}/${s}/coregistration 2> /dev/null) #define output directory
+
+	#make output directory
+	if [ ! -d "$outdir" ]; then
+		echo "making output directory"
+		mkdir ${subjdir}/${s}/coregistration
+		outdir=$(ls -d ${subjdir}/${s}/coregistration)
+	fi
+
+	#check if output is present
+	output=$(ls ${outdir}/ep2struct.mat 2> /dev/null)
+	if [ -e "$output" ]; then
+		echo "output present!-- skipping"
+		continue
+	fi
+
+	#define prestats directory and example_func
+	prestatsdir=$(ls -d ${subjdir}/${s}/prestats.feat/ 2> /dev/null)
+	example_func=$(ls $prestatsdir/example_func.nii.gz)
+	if [ ! -e "$example_func" ]; then
+		echo "example func not present-- was prestats run? skipping this run"
+		exit 0
+	fi
+
+	#bet the example_func image if not done
+	if [ ! -e "$prestatsdir/example_func_brain.nii.gz" ]; then
+		echo "running bet on example_func"
+		bet $example_func $prestatsdir/example_func_brain -f 0.3
+	fi
+
+	#run bbr
+	echo "running epi_reg_tds"
+	/import/monstrum/fndm2_new/progs/coregistration/epiregtd3v3_fndm2_20140917.sh --epi=$prestatsdir/example_func_brain --t1=$t1head --t1brain=$t1brain --t1wm=$wmseg --wd=$outdir -v --out=$outdir/ep2struct
+  	echo "output is $outdir/ep2struct.nii.gz"	
+done

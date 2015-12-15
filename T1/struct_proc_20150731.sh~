@@ -1,0 +1,121 @@
+
+#only input is a txt file as an array with the mprage folder
+#runs 1) MICO, 2) FIRST, & 3) DRAMMS to 2mm MNI template
+#segments a single subject using MICO v1.0rc4
+#runs FIRST from FSL 5.0.1
+#runs dramms v1.4
+
+#note that only imput is mprage directory-- coded rather inflexibly for day2_fndm
+
+#note that this script assumes that skull stripping has alraeady been done-- you will need to add a line where BET is run to execute skull stripping
+
+#to call this script outside of the loop you do this:
+#example:: ./struct_proc_20140708.sh /import/monstrum/day2_fndm/subjects/18013_8532/2_mprage
+
+
+####FOR USE WITH QSUB WHEN SUBMITTING THINGS ON THE GRID####  
+####WORKS AS AN ARRAY JOB-- IF THIS IS NOT COMMENTED OUT MUST COMMENT OUT THE "NON-GRID TESTING" SECTION####
+subjects=$1 #this is list of mprage directories
+mpragedir=$(cat $subjects|sed -n "${SGE_TASK_ID}p")  #only use for array jobs, comment out for non-grid testing-- this parses out the given subject's mprage directory
+########
+
+
+####FOR USE WITH NON-GRID TESTING####
+#mpragedir=$1  #for non-grid testing
+####################################
+
+
+echo ""
+cd $mpragedir
+pwd
+
+#get scanid
+scanid=$(echo $mpragedir | cut -d/ -f6 | cut -d_ -f2)
+echo "scanid is $scanid"
+
+ 
+#define whole-head image
+t1head=$(ls ${scanid}_t1.nii.gz)  #this is output of sequence2nifti.sh command
+  	if [ ! -e "$t1head" ]; then
+		echo "NO T1 WHOLE HEAD INPUT IMAGE PRESENT HERE-- EXITING!!!"
+		exit 1
+	fi
+	 
+
+#run bet to get brain-extracted image
+t1brain=$(ls ${scanid}_t1_brain.nii.gz 2> /dev/null)
+
+	if [ ! -e "${scanid}_t1_brain.nii.gz" ]; then 
+		echo "performing bet"
+		bet ${scanid}_t1.nii.gz ${scanid}_t1_brain.nii.gz
+	fi
+		echo ""
+
+#check to see if brain-extracted image present
+t1brain=$(ls ${scanid}_t1_brain.nii.gz)
+
+        if [ ! -e "${scanid}_t1_brain.nii.gz" ]; then
+                echo "NO BRAIN EXTRACTED IMAGE PRESENT HERE-- EXITING"
+                exit 1
+        fi
+                echo ""
+
+#MICO: segment T1 image if not already done
+
+mico_out=$(ls ${scanid}_t1_brain_micoseg.nii.gz 2> /dev/null)
+	if [ ! -e "$mico_out" ]; then
+		echo "running MICO segmentation"
+		/import/monstrum/Applications/sbia/mico/bin/mico --bias-correct --bias-correct-suffix _micobc --suffix _micoseg --fuzzy --fuzzy-suffix _micoprob $t1brain 
+	fi
+		echo ""
+       
+mico_out=$(ls ${scanid}_t1_brain_micoseg.nii.gz 2> /dev/null) 
+	if [ ! -e "$mico_out" ]; then
+		echo "mico output not present-- it must have failed-- exiting!!"
+		exit 1 
+	else
+ 
+		echo "MICO already run-- skipping"
+	
+	fi
+		echo ""
+
+#save individual image segments
+wm=$(ls ${scanid}_t1_brain_mico_wm.nii.gz 2> /dev/null) 
+	if [ ! -e "$wm" ]; then
+		echo "creating individual segment images"
+		fslmaths $mico_out -thr 10 -uthr 10 -bin ${scanid}_t1_brain_mico_csf.nii.gz
+		fslmaths $mico_out -thr 150 -uthr 150 -bin ${scanid}_t1_brain_mico_gm.nii.gz
+		fslmaths $mico_out -thr 250 -uthr 250 -bin ${scanid}_t1_brain_mico_wm.nii.gz
+	else
+		echo "MICO tissues segments present"
+	fi
+
+		echo ""
+
+
+echo ""
+
+#check if dramms has been run
+dramms_out=$(ls -d  ${scanid}_brain_micobc_to_mni2mm.nii.gz 2> /dev/null)
+
+	if [ ! -e "$dramms_out" ]; then
+
+	#define template
+	std=/import/monstrum/Applications/fsl5/data/standard/MNI152_T1_2mm_brain.nii.gz 
+
+	#define input impage-- use MICO corrected image
+	t1brain_mico=$(ls ${scanid}_t1_brain_micobc.nii.gz 2> /dev/null)
+	if [ ! -e "$t1brain_mico" ]; then
+		echo " NO MICO CORRECTED IMAGE-- EXITING!"
+		exit 1
+	fi
+	
+	#calculate deformation T1 to MNI
+	echo "running dramms-- calculating T1 to MNI warp"
+	/import/monstrum/Applications/dramms-1.4.0/bin/dramms -S $t1brain_mico -T $std -D ${scanid}_brain_micobc_to_mni2mm_warp -O ${scanid}_brain_micobc_to_mni2mm 
+
+else
+	echo "dramms already complete"
+
+fi

@@ -1,0 +1,37 @@
+#####Copying ITC in scanner behavioral files to new data structure (in fndm2_new)	
+
+
+#for i in `ls -d /import/monstrum/fndm2/subjects/{bipolar, depression, patients, controls *`
+
+
+
+userdir='/import/monstrum/fndm2/subjects'
+
+#create a list of individual subject data directories
+slist=`ls -d ${userdir}/{controls,patients,bipolar,depression}/*/data/behavioral/`
+
+
+#list of in scanner ITC logfiles
+itc=`ls ${userdir}/{controls,patients,bipolar,depression}/*_*/data/behavioral/RTG*.txt`
+
+
+for i in $itc	#for all the subjects with itc data
+
+do
+
+subid=`echo $itc/*_* | cut -d "/" -f 7`
+dirname=$(echo $i | cut -d "/" -f7)
+newdir=$(
+ 
+
+newdir2=$(echo "$newdir" | sed -e 's:^0*::')
+
+mkdir $newdir/behavioral
+
+cp /import/monstrum/fndm2/subjects/$subid/$newdir  /import/monstrum/fndm2_new/subjects/$subid/behavioral/
+
+cp $itc/  /import/monstrum/fndm2_new/subjects/$subid/behavioral/
+
+echo "removing zeroes"
+
+done

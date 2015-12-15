@@ -1,0 +1,102 @@
+# goal is to check if b0 map is present and can apply dico via dico_correct to all fucntional runs
+
+#note that logging functions (b0 map missing, individual sequences missing) occurs at the loop script
+
+#input is a subject level directory as part of an array job
+
+
+subjects=$1
+subjdir=$(cat $subjects|sed -n "${SGE_TASK_ID}p")  #only use for array jobs, comment out for non-grid testing
+
+#subjdir=$1  #for non-grid testing, normally comment this out
+
+echo ""
+cd $subjdir
+pwd
+
+
+
+#get scanid
+scanid=$(echo $subjdir | cut -d/ -f6 | cut -d_ -f2)
+echo "scanid is $scanid"
+
+
+#check if b0map is present
+rpsmap=$(ls -d b0map/${scanid}_rpsmap.nii 2> /dev/null)
+
+if [ -e "$rpsmap" ]; then
+	echo "b0 map present-- will use dico"
+
+else
+	echo " no b0map-- logging and exiting!!"
+	exit 1
+fi
+
+#define necessary files
+
+b0dir=$(ls -d $subjdir/b0map)
+rpsmap=$(ls $b0dir/${scanid}_rpsmap.nii)
+mag1brain=$(ls $b0dir/${scanid}_mag1_brain.nii)
+b0mask=$(ls ${b0dir}/${scanid}_mask.nii)
+
+echo "" 
+echo "b0 map files are:"
+echo "b0dir is $b0dir"
+echo "rpsmap is $rpsmap"
+echo "mag1brain is $mag1brain" 
+echo "mask is $b0mask" 
+
+
+
+
+#now go by sequence: find each functional sequence
+
+serieslist=$(ls -d *{card,face,MGH,pcasl}*)  #note that does not log/check if certain functional sequences are missing-- do that at level of loop script
+
+echo ""
+echo "series list for this subject is:"
+echo "$serieslist"
+
+
+for s in $serieslist; do
+	echo ""
+	echo "#######"
+
+	echo $s
+	outdir=$(ls -d ${subjdir}/${s}/nifti 2> /dev/null) #define output directory
+
+	#make output directory
+	if [ ! -d "$outdir" ]; then
+		echo "making output directory"
+		mkdir ${subjdir}/${s}/nifti
+		outdir=$(ls -d ${subjdir}/${s}/nifti)
+	fi
+
+
+	#check if output is present
+	output=$(ls ${outdir}/${scanid}_${s}_dico.nii.gz 2> /dev/null)
+	if [ -e "$output" ]; then
+		echo "output present!-- skipping"
+		continue
+	fi
+
+	#define dicoms
+	dicomlist=$(ls $subjdir/${s}/dicoms/*.dcm)
+
+	cd $outdir
+	pwd
+
+	echo "converting $s with dico" 
+	/import/monstrum/BBL_scripts/melliott/dico_correct_v2.sh -n -FS -f $mag1brain ${scanid}_${s} $rpsmap $b0mask $dicomlist 
+	#now at :/import/speedy/scripts/melliott/dico_correct_v2.sh
+	echo ""
+
+	#convert timeseries back to .nii.gz format 
+	echo "changing filetype to .nii.gz"
+	fslchfiletype NIFTI_GZ ${scanid}_${s}.nii
+	fslchfiletype NIFTI_GZ ${scanid}_${s}_dico.nii	
+
+done		
+	 
+
+

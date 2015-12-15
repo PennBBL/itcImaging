@@ -1,0 +1,30 @@
+#####Copying ITC in scanner behavioral files to new data structure (in fndm2_new)	
+
+folders=/import/monstrum/fndm2_new/progs/behavioral/folders.txt
+
+for j in `cat $folders`;
+do
+
+for i in `ls -d /import/monstrum/fndm2/subjects/$j/*_*`; 
+
+do
+
+subid=`echo $i | cut -d "/" -f 7`
+subid2=`echo $subid | sed 's/.//7'` ## cuts off the 0 in scanid
+newdir=/import/monstrum/fndm2_new/subjects/$subid2/
+
+echo $newdir
+
+mkdir $newdir/behavioral/
+cp $i/data/behavioral/RTG*.txt $newdir/behavioral/
+
+done
+
+done
+
+
+
+
+
+
+
